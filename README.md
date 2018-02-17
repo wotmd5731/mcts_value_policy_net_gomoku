@@ -1,1 +1,1 @@
-# mcts_value_policy_net_gomoku
+# connect5-pytorch-DQN
