@@ -21,7 +21,7 @@ from IPython.display import display
 class Checkerboard():
     empty = 0
     black = 1
-    white = -1
+    white = 2
     block = 3
     
     def __init__(self,max_size,inline_draw=False):
@@ -177,14 +177,20 @@ class Checkerboard():
         return self.board[y][x]
     
     def get_random_xy_flat(self):
-        x, y =self.get_random_xy()
-        return x+y*self.max_size
+        return random.choice(self.availables)
+        
+#        x, y =self.get_random_xy()
+#        return x+y*self.max_size
         
     def get_random_xy(self):
-        x,y = random.randint(0,self.max_size-1),random.randint(0,self.max_size-1)
-        while not self.get_xy(x,y)==self.empty:
-            x,y = random.randint(0,self.max_size-1),random.randint(0,self.max_size-1)
+        x = random.choice(self.availables)%self.max_size
+        y = random.choice(self.availables)//self.max_size
+        
         return x,y
+#        x,y = random.randint(0,self.max_size-1),random.randint(0,self.max_size-1)
+#        while not self.get_xy(x,y)==self.empty:
+#            x,y = random.randint(0,self.max_size-1),random.randint(0,self.max_size-1)
+#        return x,y
     
 
     def change_enemy(self,from_num, to_num):
