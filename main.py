@@ -27,17 +27,15 @@ def run_process(args,share_model,board_max,rank):
     from checkerboard import Checkerboard
     env = Checkerboard(board_max, args.render)
     
-    from agent import Agent_rainbow
-    B_Agent = Agent_rainbow(args)
-    W_Agent = Agent_rainbow(args)
-    B_Agent.main_dqn = B_share_model
-    W_Agent.main_dqn = W_share_model
-    B_Agent.optimizer = optim.Adam(B_share_model.parameters(), lr=args.lr, eps=args.adam_eps)
-    W_Agent.optimizer = optim.Adam(W_share_model.parameters(), lr=args.lr, eps=args.adam_eps)
+    from agent import Agent_MCTS
+    optimizer = optim.Adam(share_model.parameters(), lr=args.lr, eps=args.adam_eps)
+    Agent = Agent_MCTS(args,share_model,optimizer)
+    
+    
     
 #    from memory import PER_Memory
 #    memory = PER_Memory(args)
-    data_buffer = deque(maxlen=args.memory_capacity)     
+
     
     """
     main loop
@@ -45,10 +43,8 @@ def run_process(args,share_model,board_max,rank):
     global_count = 0
     episode = 0
 
-    W_Agent.target_dqn_update()
-    B_Agent.target_dqn_update()
-    W_Agent.train()
-    B_Agent.train()
+    Agent.target_dqn_update()
+    Agent.train()
 
     Ts =[]
     Trewards =[]
@@ -61,23 +57,20 @@ def run_process(args,share_model,board_max,rank):
         state = env.reset()
         evaluation = False
         total_reward = 0
+        states, mcts_probs, current_players = [], [], []        
+        
         if episode % args.evaluation_interval == 0 :
             evaluation = True
     #    args.epsilon -= 0.8/args.max_episode_length
         while T < args.max_step:
-            
             action_value = -999999999999999
-            if T%2 == 0 :
-                Agent_ptr = B_Agent
-                turn = env.black
-            else:
-                Agent_ptr = W_Agent
-                turn = env.white
             
-            if not evaluation and (random.random() <= args.epsilon or global_count < args.learn_start ):
-                action = env.get_random_xy_flat()
-            else:
-                action, action_value = Agent_ptr.get_action(state)
+            
+#            if not evaluation and (random.random() <= args.epsilon or global_count < args.learn_start ):
+#                action = env.get_random_xy_flat()
+#            else:
+#                action, action_value = Agent.get_action(state)
+            move, move_probs = Agent.get_action(env)
 #                print('action_value :' ,action_value)
            
             max_action_value = max(max_action_value,action_value)
@@ -87,7 +80,6 @@ def run_process(args,share_model,board_max,rank):
             
     #        if args.reward_clip > 0:
     #            reward = max(min(reward, args.reward_clip), -args.reward_clip)  # Clip rewards
-            td_error = Agent_ptr.get_td_error(reward,state,action,next_state,done)
             total_reward += reward
             memory.push(td_error,[state, action, reward, next_state, done])
             state = next_state
