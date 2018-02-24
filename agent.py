@@ -108,6 +108,14 @@ class MCTS(object):
         Arguments:
         state -- a copy of the state.
         """
+        
+        
+        """
+        now editing
+        state가 board가 들어오는데 
+        _policy(state) 가 어떻게 동작하는지 모르겟음.
+        state 가 board 가 들어오던데...
+        """
         node = self._root
         while(1):            
             if node.is_leaf():
@@ -170,6 +178,8 @@ class Agent_MCTS(nn.Module):
     def __init__(self,args,share_model,opti):
         super().__init__()
         c_puct=5, n_playout=2000, is_selfplay=1
+        self.main_dqn = share_model
+        self.optimizer  = opti
         
         self.mcts = MCTS(self.main_dqn, c_puct, n_playout)
         
@@ -181,7 +191,7 @@ class Agent_MCTS(nn.Module):
         self.state_space = args.state_space
         
 #        self.main_dqn= DQN_model(args)
-        self.main_dqn = share_model
+        
 #        self.main_dqn.train()
 #        self.target_dqn = DQN_rainbow(args)
 #        self.target_dqn = target_model
@@ -189,7 +199,7 @@ class Agent_MCTS(nn.Module):
 #        self.target_dqn.eval()
         
 #        self.optimizer = optim.Adam(self.main_dqn.parameters(), lr=args.lr, eps=args.adam_eps)
-        self.optimizer  = opti
+        
       
     def reset_player(self):
         self.mcts.update_with_move(-1) 
@@ -207,14 +217,11 @@ class Agent_MCTS(nn.Module):
     def target_dqn_update(self):
         self.target_dqn.parameter_update(self.main_dqn)
     
-    
-    def get_action(self, env):
-        sensible_moves = env.availables
-        move_probs = np.zeros(env.width*env.height)
-        
+    def get_action(self, board, temp=1e-3, return_prob=0):
+        sensible_moves = board.availables
+        move_probs = np.zeros(board.width*board.height) # the pi vector returned by MCTS as in the alphaGo Zero paper
         if len(sensible_moves) > 0:
-            acts, probs = self.mcts.get_move_probs(env, temp)
-            
+            acts, probs = self.mcts.get_move_probs(board, temp)
             move_probs[list(acts)] = probs         
             if self._is_selfplay:
                 # add Dirichlet Noise for exploration (needed for self-play training)
@@ -225,10 +232,13 @@ class Agent_MCTS(nn.Module):
                 move = np.random.choice(acts, p=probs)       
                 # reset the root node
                 self.mcts.update_with_move(-1)             
-#                location = env.move_to_location(move)
+#                location = board.move_to_location(move)
 #                print("AI move: %d,%d\n" % (location[0], location[1]))
                 
-            return move, move_probs
+            if return_prob:
+                return move, move_probs
+            else:
+                return move
         else:            
             print("WARNING: the board is full")
         
