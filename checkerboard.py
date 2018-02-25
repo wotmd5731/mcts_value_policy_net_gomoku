@@ -24,40 +24,31 @@ class Checkerboard():
     white = 2
     block = 3
     
-    def __init__(self,max_size,inline_draw=False):
-        self.inline_draw = inline_draw
+    def __init__(self,max_size):
         self.width = max_size
         self.height = max_size
         
         self.max_size = max_size
 #        self.board = [[ self.empty ]*max_size for i in range(max_size)]  
         self.states= {}
-        self.current_player = self.black
+        self.players = [1, 2]
+        self.current_player = self.players[0]
         self.availables = list(range(self.max_size * self.max_size))
         self.last_move = -1
-        self.players = [1, 2]
-        
-        if inline_draw:
-            self.fig = plt.figure(figsize=(3,3))
-            self.ax = self.fig.add_subplot(1,1,1)
-            self.ax.set(xlim=[-1, max_size], ylim=[-1, max_size], title='Example', xlabel='xAxis', ylabel='yAxis')
-            # Major ticks every 20, minor ticks every 5
-            major_ticks = np.arange(0, max_size+1, 1)
-    #        minor_ticks = np.arange(0, max_size+1, 1)
-            self.ax.set_xticks(major_ticks)
-    #        self.ax.set_xticks(minor_ticks, minor=True)
-            self.ax.set_yticks(major_ticks)
-    #        self.ax.set_yticks(minor_ticks, minor=True)
-            # And a corresponding grid
-            self.ax.grid(which='both')
-            # Or if you want different settings for the grids:
-    #        self.ax.grid(which='minor', alpha=0.5)
-            self.ax.grid(which='major', alpha=0.5)
-            self.ax.grid(color='black', linestyle='-', linewidth=0.5)
-    #        plt.xticks(range(11))
-    #        plt.show()
+        self.n_in_row = 4 # need how many pieces in a row to win
         
         
+    def reset(self, start_player=0):
+        self.states= {}
+        self.current_player = self.players[start_player]  # start player        
+        self.availables = list(range(self.max_size * self.max_size))
+        self.last_move = -1
+#        for y in range(self.max_size):
+#            for x in range(self.max_size):
+#                self.board[y][x] = 0
+#        ss = torch.LongTensor(self.board)
+    
+    
     def __repr__(self):
         return "info  max_size %d " % (self.max_size)
 
@@ -67,7 +58,7 @@ class Checkerboard():
             print(i,self.board[i])
         return '-----end-----'
     
-    def current_state(self,player): 
+    def current_state(self): 
         """return the board state from the perspective of the current player
         shape: 4*width*height"""
         
@@ -80,26 +71,11 @@ class Checkerboard():
             square_state[1][move_oppo // self.width, move_oppo % self.height] = 1.0   
             square_state[2][self.last_move //self.width, self.last_move % self.height] = 1.0 # last move indication   
         
-        square_state[3][:,:] = player
+        square_state[3][:,:] = self.current_player
             
         return square_state[:,::-1,:]
     
-    def reset(self):
-        self.states= {}
-        self.current_player = self.black
-        self.availables = list(range(self.max_size * self.max_size))
-        self.last_move = -1
-        
-#        for y in range(self.max_size):
-#            for x in range(self.max_size):
-#                self.board[y][x] = 0
-        if self.inline_draw:
-            self.ax.patches.clear()
-        
-        ret = self.current_state(self.current_player)
-#        ss = torch.LongTensor(self.board)
-        return ret
-    
+
     def _check_rec(self, x, y, dx, dy , stone):
         if x<0 or x>=self.max_size or y<0 or y>=self.max_size or self.get_xy(x,y)!=stone:
             return 0
@@ -120,59 +96,77 @@ class Checkerboard():
         # 5개 완성 시 리턴 1
         if max_ret == 5:
 #            reward = 1
-            reward = 0
-            self.next_done_flag = 1
-            print("create 5connection by me ! **** you win ****")
+            reward = 1
+            done = 1
+#            self.next_done_flag = 1
+#            print("create 5connection by me ! **** you win ****")
         #6개 완성시 자동 패배
         elif max_ret == 6:
             reward = -1
-            self.next_done_flag = 2
+            done = 1
+#            self.next_done_flag = 2
         return reward , done
 
-    def step_flat(self, num ,stone):
-        return self.step(int(num%self.max_size),int(num/self.max_size), stone)
+    def has_a_winner(self):
+        width = self.width
+        height = self.height
+        states = self.states
+        n = self.n_in_row
 
-    def step(self, move, stone):
+        moved = list(set(range(width * height)) - set(self.availables))
+        if(len(moved) < self.n_in_row + 2):
+            return False, -1
+
+        for m in moved:
+            h = m // width
+            w = m % width
+            player = states[m]
+
+            if (w in range(width - n + 1) and
+                len(set(states.get(i, -1) for i in range(m, m + n))) == 1):
+                return True, player
+
+            if (h in range(height - n + 1) and
+                len(set(states.get(i, -1) for i in range(m, m + n * width, width))) == 1):
+                return True, player
+
+            if (w in range(width - n + 1) and h in range(height - n + 1) and
+                len(set(states.get(i, -1) for i in range(m, m + n * (width + 1), width + 1))) == 1):
+                return True, player
+
+            if (w in range(n - 1, width) and h in range(height - n + 1) and
+                len(set(states.get(i, -1) for i in range(m, m + n * (width - 1), width - 1))) == 1):
+                return True, player
+
+        return False, -1
+
+    def game_end(self):
+        """Check whether the game is ended or not"""
+        win, winner = self.has_a_winner()
+        if win:
+            return True, winner
+        elif not len(self.availables):#            
+            return True, -1
+        return False, -1
+
+    def get_current_player(self):
+        return self.current_player
+
+
+
+    def step(self, move):
         self.states[move] = self.current_player
         self.availables.remove(move)
-        self.current_player = self.players[0] if self.current_player == self.players[1] else self.players[1] 
+        
         self.last_move = move
         x = int(move%self.max_size)
         y = int(move/self.max_size)
-        
-#        if self.get_xy(x,y) != self.empty:
-#            print("same position -1 ")
-#            return torch.zeros([self.max_size,self.max_size]).type(torch.LongTensor), -1, 1 ,0
-#        #이전 step 에서 flag 가 1 떻을때 1-> 상대방 5목 완성, 내턴에서 마이너스 리턴.
-#        """상대방 오목 완성에 대한 역보상 """
-#        if self.next_done_flag==1:
-#            print("created 5 connection **** you loss ****")
-#            return torch.zeros([self.max_size,self.max_size]).type(torch.LongTensor), -1, 1 ,0
-#        #이전 step 에서 flag 2받을 경우 상대방이 6목 만들어 자폭, 나는 무상관 0 
-#        elif self.next_done_flag == 2:
-#            print("created 6 connection **** you win *****")
-#            return torch.zeros([self.max_size,self.max_size]).type(torch.LongTensor), 0, 1 ,0
-        self.set_xy_draw(x,y,stone)
-        
-        ss_ = self.current_state(self.current_player)
+
+        self.current_player = self.players[0] if self.current_player == self.players[1] else self.players[1] 
 #         = torch.LongTensor(self.board)
-        rr,dd = self._check_done(x,y,stone)
+#        rr,dd = self._check_done(x,y,stone)
             
-        return ss_,rr,dd,0
         
-    
-    def set_xy_draw(self, x, y, stone):
-#        self.board[y][x] = stone
-        if stone == self.black:
-            ax_stone = patches.Circle((x, y), 0.5, facecolor='black', edgecolor='black',linewidth=1)
-            self.ax.add_patch(ax_stone)
-        elif stone == self.white:
-            ax_stone = patches.Circle((x, y), 0.5, facecolor='white', edgecolor='black',linewidth=1)
-            self.ax.add_patch(ax_stone)
-        elif stone == self.block:
-            ax_stone = patches.Circle((x, y), 0.5, facecolor='blue', edgecolor='black',linewidth=1)
-            self.ax.add_patch(ax_stone)
-        pass
     def get_xy(self, x ,y ):
         return self.board[y][x]
     
@@ -193,22 +187,39 @@ class Checkerboard():
 #        return x,y
     
 
-    def change_enemy(self,from_num, to_num):
-        if self.black ==from_num :
-            self.black=to_num
-            self.white=from_num
-        else :
-            self.black=to_num
-            self.white=from_num
-            
-        for y in range(self.max_size):
-            for x in range(self.max_size):
-                if self.board[y][x] == from_num:
-                    self.board[y][x] = to_num
-                elif self.board[y][x] == to_num:
-                    self.board[y][x] = from_num
+    
 
-    def draw(self):
+class BoardRender():
+
+    def __init__(self, max_size):
+        self.inline_draw = 0
+        self.max_size = max_size
+#        if inline_draw:
+        self.fig = plt.figure(figsize=(3,3))
+        self.ax = self.fig.add_subplot(1,1,1)
+        self.ax.set(xlim=[-1, max_size], ylim=[-1, max_size], title='Example', xlabel='xAxis', ylabel='yAxis')
+        # Major ticks every 20, minor ticks every 5
+        major_ticks = np.arange(0, max_size+1, 1)
+#        minor_ticks = np.arange(0, max_size+1, 1)
+        self.ax.set_xticks(major_ticks)
+#        self.ax.set_xticks(minor_ticks, minor=True)
+        self.ax.set_yticks(major_ticks)
+#        self.ax.set_yticks(minor_ticks, minor=True)
+        # And a corresponding grid
+        self.ax.grid(which='both')
+        # Or if you want different settings for the grids:
+#        self.ax.grid(which='minor', alpha=0.5)
+        self.ax.grid(which='major', alpha=0.5)
+        self.ax.grid(color='black', linestyle='-', linewidth=0.5)
+#        plt.xticks(range(11))
+#        plt.show()
+    def clear(self):
+        self.ax.patches.clear()
+        
+    def draw(self,board_states):
+        
+        for key , val in board_states.items():
+            self.set_xy_draw(int(key%self.max_size),int(key//self.max_size),val)
 #        plt.clf()
 #        self.ax.draw()
 #        self.ax.figure.canvas.draw()
@@ -225,38 +236,41 @@ class Checkerboard():
             plt.pause(0.001)            
         pass
     
-    def render(self):
-        self.draw()
 
 
+    def set_xy_draw(self, x, y, stone):
+#        self.board[y][x] = stone
+        if stone == 1:
+            ax_stone = patches.Circle((x, y), 0.5, facecolor='black', edgecolor='black',linewidth=1)
+            self.ax.add_patch(ax_stone)
+        elif stone == 2:
+            ax_stone = patches.Circle((x, y), 0.5, facecolor='white', edgecolor='black',linewidth=1)
+            self.ax.add_patch(ax_stone)
+        elif stone == 3:
+            ax_stone = patches.Circle((x, y), 0.5, facecolor='blue', edgecolor='black',linewidth=1)
+            self.ax.add_patch(ax_stone)
+        pass
+        
 
 if __name__=="__main__":
-    board = Checkerboard(10)
+    board = Checkerboard(10,inline_draw = True)
+#    board = Checkerboard(10)
     board.reset()
-    
     for i in range(100):
         "x,y = black agent .get_action(state)"
-        x,y = board.get_random_xy()
-        ss_ , rr, dd,_ = board.step(x,y,board.black)
+        mv = board.get_random_xy_flat()
+        board.step(mv)
+        print(board.current_state(board.players[0]))
         board.draw()
-        if dd:
-            print("done black win")
-            break
-        elif dd==-1:
-            print("connect 6 black lose")
-            break
+        print(board.game_end())
         
-        "x,y = white agent .get_action(state)"
-        x,y = board.get_random_xy()
-        ss_ , rr, dd,_ = board.step(x,y,board.white)
-        board.draw()
-        if dd:
-            print("done white win")
-            break
-        elif dd==-1:
-            print("connect 6 white lose")
-            break
-        
+#        "x,y = white agent .get_action(state)"
+#        mv = board.get_random_xy_flat()
+#        ss_ , rr, dd,winner = board.step(mv)
+#        board.draw()
+#        if dd:
+#            print("winner : ",winner)
+#            break
     
 
 

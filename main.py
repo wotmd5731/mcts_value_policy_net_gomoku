@@ -21,102 +21,83 @@ X - MCTS
 #define test function
 #"""
 from plot import _plot_line
-
+def get_equi_data(play_data,board_height,board_width):
+    """
+    augment the data set by rotation and flipping
+    play_data: [(state, mcts_prob, winner_z), ..., ...]"""
+#        [state, mcts_porb, winner ]  = zip(*play_data)
+    extend_data = []
+    for state, mcts_porb, winner in play_data:
+        for i in [1,2,3,4]:
+            # rotate counterclockwise 
+            equi_state = np.array([np.rot90(s,i) for s in state])
+            equi_mcts_prob = np.rot90(np.flipud(mcts_porb.reshape(board_height, board_width)), i)
+            extend_data.append((equi_state, np.flipud(equi_mcts_prob).flatten(), winner))
+            # flip horizontally
+            equi_state = np.array([np.fliplr(s) for s in equi_state])
+            equi_mcts_prob = np.fliplr(equi_mcts_prob)
+            extend_data.append((equi_state, np.flipud(equi_mcts_prob).flatten(), winner))
+    return extend_data
+    
+    
 def run_process(args,share_model,board_max,rank):
     
-    from checkerboard import Checkerboard
-    env = Checkerboard(board_max, args.render)
+    from checkerboard import Checkerboard, BoardRender
+    board = Checkerboard(board_max)
+    board_render = BoardRender(board_max)
+    board_render.clear()
     
     from agent import Agent_MCTS
-    optimizer = optim.Adam(share_model.parameters(), lr=args.lr, eps=args.adam_eps)
-    Agent = Agent_MCTS(args,share_model,optimizer)
     
+    agent = Agent_MCTS(args,0,0,board_max)
     
-    
-#    from memory import PER_Memory
-#    memory = PER_Memory(args)
-
-    
-    """
-    main loop
-    """
-    global_count = 0
-    episode = 0
-
-    Agent.target_dqn_update()
-    Agent.train()
+    data_buffer = deque(maxlen=10000)
 
     Ts =[]
     Trewards =[]
     TQmax = []
-    while episode < args.max_episode_length:
+    for episode in range(10):
         random.seed(time.time())
-        T=0
-        turn = 0
-        max_action_value = -999999999999999
-        state = env.reset()
-        evaluation = False
-        total_reward = 0
+        board.reset()
+        board_render.clear()
+        
+        """ start a self-play game using a MCTS player, reuse the search tree
+        store the self-play data: (state, mcts_probs, z)
+        """
+        p1, p2 = board.players
         states, mcts_probs, current_players = [], [], []        
-        
-        if episode % args.evaluation_interval == 0 :
-            evaluation = True
-    #    args.epsilon -= 0.8/args.max_episode_length
-        while T < args.max_step:
-            action_value = -999999999999999
-            
-            
-#            if not evaluation and (random.random() <= args.epsilon or global_count < args.learn_start ):
-#                action = env.get_random_xy_flat()
-#            else:
-#                action, action_value = Agent.get_action(state)
-            move, move_probs = Agent.get_action(env)
-#                print('action_value :' ,action_value)
-           
-            max_action_value = max(max_action_value,action_value)
+        for step in range(10000):
+            if len(data_buffer) > 32:
+                    loss, entropy = agent.learn(data_buffer)
+#                    print('loss : ',loss,' entropy : ',entropy)
                     
-            next_state , reward , done, _ = env.step_flat(action,turn)
-#            env.render()
-            
-    #        if args.reward_clip > 0:
-    #            reward = max(min(reward, args.reward_clip), -args.reward_clip)  # Clip rewards
-            total_reward += reward
-            memory.push(td_error,[state, action, reward, next_state, done])
-            state = next_state
-            
-        
-        
-            # replay_interval, target_update_interval  only used  odd number 
-            if not evaluation and global_count % args.replay_interval == 0 and global_count > args.learn_start:
-                Agent_ptr.learn(memory)
-                Agent_ptr.reset_noise()
-
-            if not evaluation and global_count % args.target_update_interval == 0 :
-                Agent_ptr.target_dqn_update()
+            move, move_probs = agent.get_action(board, temp=1.0, return_prob=1)
+            # store the data
+            states.append(board.current_state())
+            mcts_probs.append(move_probs)
+            current_players.append(board.current_player)
+            # perform a move
+            board.step(move)
+            board_render.draw(board.states)
+            end, winner = board.game_end()
+            if end:
+                # winner from the perspective of the current player of each state
+                winners_z = np.zeros(len(current_players))  
+                if winner != -1:
+                    winners_z[np.array(current_players) == winner] = 1.0
+                    winners_z[np.array(current_players) != winner] = -1.0
+                #reset MCTS root node
+                agent.reset_player() 
+                if winner != -1:
+                    print("Game end. Winner is player:", winner)
+                else:
+                    print("Game end. Tie")
+#                return winner, zip(states, mcts_probs, winners_z)
+                play_data = zip(states, mcts_probs, winners_z)
+                ex_play_data = get_equi_data(play_data,board_max,board_max)
+                data_buffer.extend(ex_play_data)
                 
-                
-            T += 1
-            global_count += 1
-            
-            if done :
-                B_Agent.reset_noise()
-                W_Agent.reset_noise()
-                
-                if args.render:
-                    env.render()
                 break
-        
-        if evaluation :
-            print('episode : ', episode, '  step : ',T, ' max_action ',max_action_value, 'total_reward : ' , total_reward)
-            Ts.append(episode)
-            Trewards.append([total_reward])
-            TQmax.append([max_action_value])
-            _plot_line(Ts, Trewards, 'rewards_'+args.name+'_'+str(rank), path='results')
-            _plot_line(Ts, TQmax, 'Q_'+args.name+'_'+str(rank), path='results')
-        if episode % args.save_interval ==0 :
-            print('save')
-            B_Agent.save('B'+args.name)
-            W_Agent.save('W'+args.name)
 
         episode += 1
         
@@ -201,15 +182,15 @@ if __name__ == '__main__':
 #        args.target_update_interval += 1
 #    
 
-    
-    from model import PV_NET
-    share_model = PV_NET(args)
-    share_model.share_memory()
+#    
+#    from model import PV_NET
+#    share_model = PV_NET(args)
+#    share_model.share_memory()
 #    if os.path.exists('B'+args.name):
 #        print('load')
 #        B_share_model.load_state_dict(torch.load('B'+args.name))
 #        W_share_model.load_state_dict(torch.load('W'+args.name))
-    
+    share_model=0
     run_process(args,share_model,board_max,999)
     
 #    num_processes = 8
