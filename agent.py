@@ -176,9 +176,9 @@ class MCTS(object):
 from model import PolicyValueNet
 
 class Agent_MCTS(nn.Module):
-    def __init__(self,args,share_model,opti,board_max,param):
+    def __init__(self,args,share_model,opti,board_max,param,is_selfplay=True):
         super().__init__()
-        self._is_selfplay=1
+        self._is_selfplay=is_selfplay
         self.learn_rate = 5e-3
         self.lr_multiplier = 1.0  # adaptively adjust the learning rate based on KL
         self.temp = 1.0 # the temperature param

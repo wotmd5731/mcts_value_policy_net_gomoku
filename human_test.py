@@ -25,10 +25,11 @@ def run_process(args,share_model,board_max,n_rows,rank):
     
     from checkerboard import Checkerboard, BoardRender
     board = Checkerboard(board_max,n_rows)
-    board_render = BoardRender(board_max,render_off=True,inline_draw=True)
+    board_render = BoardRender(board_max,render_off=False,inline_draw=True)
     board_render.clear()
+    board_render.draw(board.states)
     
-    for episode in range(1000):
+    for episode in range(1):
         random.seed(time.time())
         board.reset()
         board_render.clear()
@@ -47,6 +48,7 @@ def run_process(args,share_model,board_max,n_rows,rank):
                 ss =input('input x,y:')
                 pos = ss.split(',')
                 move = int(pos[0])+int(pos[1])*board_max
+                print('movd ',move)
             else:            
                 move, move_probs = agent.get_action(board, temp=1.0, return_prob=1)
             board.step(move)
@@ -155,7 +157,7 @@ if __name__ == '__main__':
 #        W_share_model.load_state_dict(torch.load('W'+args.name))
     n_rows = 4
     from agent import Agent_MCTS
-    agent = Agent_MCTS(args,0,0,board_max,param='./net_param')
+    agent = Agent_MCTS(args,0,0,board_max,param='./net_param',is_selfplay=False)
     try:
         run_process(args,agent,board_max,n_rows,999)
     except:
