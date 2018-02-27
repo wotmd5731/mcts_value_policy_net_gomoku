@@ -24,7 +24,7 @@ class Checkerboard():
     white = 2
     block = 3
     
-    def __init__(self,max_size):
+    def __init__(self,max_size,n_in_row):
         self.width = max_size
         self.height = max_size
         
@@ -35,7 +35,7 @@ class Checkerboard():
         self.current_player = self.players[0]
         self.availables = list(range(self.max_size * self.max_size))
         self.last_move = -1
-        self.n_in_row = 4 # need how many pieces in a row to win
+        self.n_in_row =n_in_row # need how many pieces in a row to win
         
         
     def reset(self, start_player=0):
@@ -191,8 +191,10 @@ class Checkerboard():
 
 class BoardRender():
 
-    def __init__(self, max_size):
-        self.inline_draw = 0
+    def __init__(self, max_size,render_off=False,inline_draw = False):
+        self.render_off = render_off
+        if self.render_off:return
+        self.inline_draw = inline_draw
         self.max_size = max_size
 #        if inline_draw:
         self.fig = plt.figure(figsize=(3,3))
@@ -214,10 +216,11 @@ class BoardRender():
 #        plt.xticks(range(11))
 #        plt.show()
     def clear(self):
+        if self.render_off:return
         self.ax.patches.clear()
         
     def draw(self,board_states):
-        
+        if self.render_off:return
         for key , val in board_states.items():
             self.set_xy_draw(int(key%self.max_size),int(key//self.max_size),val)
 #        plt.clf()
@@ -228,12 +231,14 @@ class BoardRender():
 #        self.ax.update()
 #        plt.draw()
 #        self.fig.clf()
-        plt.show()
+#        plt.show()
         # ipython command 
         if self.inline_draw:
             display(self.fig)
         else :
             plt.pause(0.001)            
+        print(' ')
+        
         pass
     
 

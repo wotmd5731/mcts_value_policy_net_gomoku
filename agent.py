@@ -176,7 +176,7 @@ class MCTS(object):
 from model import PolicyValueNet
 
 class Agent_MCTS(nn.Module):
-    def __init__(self,args,share_model,opti,board_max):
+    def __init__(self,args,share_model,opti,board_max,param):
         super().__init__()
         self._is_selfplay=1
         self.learn_rate = 5e-3
@@ -218,6 +218,10 @@ class Agent_MCTS(nn.Module):
       
     def reset_player(self):
         self.mcts.update_with_move(-1) 
+        
+    def save(self):
+        print('save')
+        torch.save(self.policy_value_net.policy_value_net.state_dict(),'./net_param')
         
         
 #    def save(self,path ='./param.p'):

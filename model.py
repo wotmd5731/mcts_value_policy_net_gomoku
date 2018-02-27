@@ -68,7 +68,11 @@ class PolicyValueNet():
         self.optimizer = optim.Adam(self.policy_value_net.parameters(), weight_decay=self.l2_const)
 
         if net_params:
-            self.policy_value_net.load_state_dict(net_params)
+            try:
+                self.policy_value_net.load_state_dict(net_params)
+            except:
+                print('load fail')
+                pass
 
     def policy_value(self, state_batch):
         """

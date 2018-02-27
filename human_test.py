@@ -20,25 +20,6 @@ X - MCTS
 #"""
 #define test function
 #"""
-from plot import _plot_line
-def get_equi_data(play_data,board_height,board_width):
-    """
-    augment the data set by rotation and flipping
-    play_data: [(state, mcts_prob, winner_z), ..., ...]"""
-#        [state, mcts_porb, winner ]  = zip(*play_data)
-    extend_data = []
-    for state, mcts_porb, winner in play_data:
-        for i in [1,2,3,4]:
-            # rotate counterclockwise 
-            equi_state = np.array([np.rot90(s,i) for s in state])
-            equi_mcts_prob = np.rot90(np.flipud(mcts_porb.reshape(board_height, board_width)), i)
-            extend_data.append((equi_state, np.flipud(equi_mcts_prob).flatten(), winner))
-            # flip horizontally
-            equi_state = np.array([np.fliplr(s) for s in equi_state])
-            equi_mcts_prob = np.fliplr(equi_mcts_prob)
-            extend_data.append((equi_state, np.flipud(equi_mcts_prob).flatten(), winner))
-    return extend_data
-    
     
 def run_process(args,share_model,board_max,n_rows,rank):
     
@@ -47,11 +28,6 @@ def run_process(args,share_model,board_max,n_rows,rank):
     board_render = BoardRender(board_max,render_off=True,inline_draw=True)
     board_render.clear()
     
-    data_buffer = deque(maxlen=100000)
-
-    Ts =[]
-    Trewards =[]
-    TQmax = []
     for episode in range(1000):
         random.seed(time.time())
         board.reset()
@@ -61,38 +37,29 @@ def run_process(args,share_model,board_max,n_rows,rank):
         store the self-play data: (state, mcts_probs, z)
         """
         p1, p2 = board.players
-        states, mcts_probs, current_players = [], [], []        
+        player = input('select player 1: balck , 2 : white')
+        if player=='1':
+            play_step = 0
+        else:
+            play_step = 1
         for step in range(10000):
-            if len(data_buffer) > 32:
-                    loss, entropy = agent.learn(data_buffer)
-#                    print('loss : ',loss,' entropy : ',entropy)
-                    
-            move, move_probs = agent.get_action(board, temp=1.0, return_prob=1)
-            # store the data
-            states.append(board.current_state())
-            mcts_probs.append(move_probs)
-            current_players.append(board.current_player)
-            # perform a move
+            if step %2 == play_step:
+                ss =input('input x,y:')
+                pos = ss.split(',')
+                move = int(pos[0])+int(pos[1])*board_max
+            else:            
+                move, move_probs = agent.get_action(board, temp=1.0, return_prob=1)
             board.step(move)
             board_render.draw(board.states)
             end, winner = board.game_end()
             if end:
                 # winner from the perspective of the current player of each state
-                winners_z = np.zeros(len(current_players))  
-                if winner != -1:
-                    winners_z[np.array(current_players) == winner] = 1.0
-                    winners_z[np.array(current_players) != winner] = -1.0
-                #reset MCTS root node
                 agent.reset_player() 
                 if winner != -1:
                     print("Game end. Winner is player:", winner)
                 else:
                     print("Game end. Tie")
 #                return winner, zip(states, mcts_probs, winners_z)
-                play_data = zip(states, mcts_probs, winners_z)
-                ex_play_data = get_equi_data(play_data,board_max,board_max)
-                data_buffer.extend(ex_play_data)
-                
                 break
 
         episode += 1
@@ -193,7 +160,7 @@ if __name__ == '__main__':
         run_process(args,agent,board_max,n_rows,999)
     except:
         print('except save')
-        agent.save()
+#        agent.save()
         
 #    num_processes = 8
 #    processes = []
