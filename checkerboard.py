@@ -197,7 +197,7 @@ class BoardRender():
         self.inline_draw = inline_draw
         self.max_size = max_size
 #        if inline_draw:
-        self.fig = plt.figure(figsize=(3,3))
+        self.fig = plt.figure(figsize=(2,2))
         self.ax = self.fig.add_subplot(1,1,1)
         self.ax.set(xlim=[-1, max_size], ylim=[-1, max_size], title='Example', xlabel='xAxis', ylabel='yAxis')
         # Major ticks every 20, minor ticks every 5

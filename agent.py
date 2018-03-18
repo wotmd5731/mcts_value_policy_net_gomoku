@@ -194,7 +194,7 @@ class Agent_MCTS(nn.Module):
         # num of simulations used for the pure mcts, which is used as the opponent to evaluate the trained policy
         self.pure_mcts_playout_num = 1000  
         
-        self.policy_value_net = PolicyValueNet(board_max,board_max)
+        self.policy_value_net = PolicyValueNet(board_max,board_max,net_params = param)
         self.mcts = MCTS(self.policy_value_net.policy_value_fn, self.c_puct, self.n_playout)
         
         

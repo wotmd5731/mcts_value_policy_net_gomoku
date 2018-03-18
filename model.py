@@ -69,7 +69,8 @@ class PolicyValueNet():
 
         if net_params:
             try:
-                self.policy_value_net.load_state_dict(net_params)
+                self.policy_value_net.load_state_dict(torch.load(net_params))
+                print('load')
             except:
                 print('load fail')
                 pass

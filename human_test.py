@@ -47,6 +47,8 @@ def run_process(args,share_model,board_max,n_rows,rank):
             if step %2 == play_step:
                 ss =input('input x,y:')
                 pos = ss.split(',')
+                if pos == 'q' :
+                    return
                 move = int(pos[0])+int(pos[1])*board_max
                 print('movd ',move)
             else:            
